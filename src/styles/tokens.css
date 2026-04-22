@@ -1,0 +1,13 @@
+:root {
+  --color-ink: #162021;
+  --color-paper: #f3efe3;
+  --color-panel: #fffdf7;
+  --color-line: #c9bfa9;
+  --color-accent: #216869;
+  --color-accent-soft: #d7ebe8;
+  --color-warn: #8b4a1f;
+  --color-error: #8f2d2d;
+  --shadow-soft: 0 18px 40px rgba(22, 32, 33, 0.08);
+  --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", sans-serif;
+}
