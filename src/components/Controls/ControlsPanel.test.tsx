@@ -14,13 +14,11 @@ describe("Story 2.2 parameter controls and defaults", () => {
     expect(screen.getByLabelText(/coupling strength \(λ\)/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/reference debye cutoff \(ω_D,ref\)/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/fermi energy \(E_F\)/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/isotope mass \(M\)/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^temperature \(T\)$/i)).toBeInTheDocument();
 
     expect(screen.getByLabelText(/current parameter state/i)).toHaveTextContent("0.30");
     expect(screen.getByLabelText(/current parameter state/i)).toHaveTextContent("10.0");
     expect(screen.getByLabelText(/current parameter state/i)).toHaveTextContent("100");
-    expect(screen.getByLabelText(/current parameter state/i)).toHaveTextContent("1.00");
   });
 
   it("preserves the explorer session context across repeated parameter changes", async () => {
@@ -30,12 +28,10 @@ describe("Story 2.2 parameter controls and defaults", () => {
     await user.click(screen.getByRole("button", { name: /open explorer/i }));
 
     fireEvent.change(screen.getByLabelText(/coupling strength \(λ\)/i), { target: { value: "0.37" } });
-    fireEvent.change(screen.getByLabelText(/isotope mass \(M\)/i), { target: { value: "1.50" } });
     fireEvent.change(screen.getByLabelText(/^temperature \(T\)$/i), { target: { value: "0.200" } });
 
     expect(screen.getByText(/stateful spa exploration/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/current parameter state/i)).toHaveTextContent("0.37");
-    expect(screen.getByLabelText(/current parameter state/i)).toHaveTextContent("1.50");
     expect(screen.getByLabelText(/current parameter state/i)).toHaveTextContent("0.200");
     expect(screen.getByText(/updating: previous computed values are shown as stale/i)).toBeInTheDocument();
 
@@ -56,7 +52,6 @@ describe("Story 2.2 parameter controls and defaults", () => {
     expect(screen.getByLabelText(/current parameter state/i)).toHaveTextContent("0.30");
     expect(screen.getByLabelText(/current parameter state/i)).toHaveTextContent("10.0");
     expect(screen.getByLabelText(/current parameter state/i)).toHaveTextContent("100");
-    expect(screen.getByLabelText(/current parameter state/i)).toHaveTextContent("1.00");
     expect(screen.getByLabelText(/current parameter state/i)).toHaveTextContent("0.101");
   });
 
@@ -70,11 +65,30 @@ describe("Story 2.2 parameter controls and defaults", () => {
     expect(Number(temperatureControl.getAttribute("max"))).toBeCloseTo(0.5056190648854041, 12);
 
     fireEvent.change(screen.getByLabelText(/temperature \(T\)/i), { target: { value: "0.500" } });
-    fireEvent.change(screen.getByLabelText(/isotope mass \(M\)/i), { target: { value: "4.00" } });
+    expect(Number(screen.getByLabelText(/^temperature \(T\)$/i).getAttribute("max"))).toBeCloseTo(0.5056190648854041, 12);
+  });
 
-    expect(Number(screen.getByLabelText(/^temperature \(T\)$/i).getAttribute("max"))).toBeCloseTo(0.25280953244270206, 12);
-    expect(screen.getByLabelText(/current parameter state/i)).toHaveTextContent("0.253");
-    expect(within(screen.getByLabelText(/^validity guidance$/i)).getByText(/near the transition envelope edge/i)).toBeInTheDocument();
+  it("animates temperature through the existing state pipeline and pauses in place", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /open explorer/i }));
+
+    const temperatureControl = screen.getByLabelText(/^temperature \(T\)$/i) as HTMLInputElement;
+    const initialTemperature = Number(temperatureControl.value);
+
+    await user.click(screen.getByRole("button", { name: /^play$/i }));
+    expect(screen.getByRole("button", { name: /^pause$/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/transition narrative/i)).toHaveTextContent(/strong pairing regime|pair breaking begins|gap collapse imminent|normal metal/i);
+
+    await waitFor(() => expect(Number((screen.getByLabelText(/^temperature \(T\)$/i) as HTMLInputElement).value)).toBeGreaterThan(initialTemperature));
+    await waitFor(() => expect(screen.getByLabelText(/gap plot readout/i)).not.toHaveTextContent("1.64170"));
+
+    await user.click(screen.getByRole("button", { name: /^pause$/i }));
+    const pausedTemperature = Number((screen.getByLabelText(/^temperature \(T\)$/i) as HTMLInputElement).value);
+
+    await new Promise((resolve) => window.setTimeout(resolve, 240));
+    expect(Number((screen.getByLabelText(/^temperature \(T\)$/i) as HTMLInputElement).value)).toBeCloseTo(pausedTemperature, 6);
   });
 });
 
@@ -144,7 +158,6 @@ describe("Story 4.3 session export", () => {
         { key: "lambda", symbol: "λ", label: "Coupling strength", unit: "dimensionless", value: 0.4 },
         { key: "omega_D_ref", symbol: "ω_D,ref", label: "Reference Debye cutoff", unit: "energy", value: 10 },
         { key: "E_F", symbol: "E_F", label: "Fermi energy", unit: "energy", value: 20 },
-        { key: "M", symbol: "M", label: "Isotope mass", unit: "relative mass", value: 1 },
         { key: "T", symbol: "T", label: "Temperature", unit: "energy", value: 0.1 },
       ],
       effectiveParameters: { omega_D: 10, omega_D_over_E_F: 0.5 },

@@ -14,7 +14,6 @@ export function getShellDefaultParameters(): ParameterVector {
     lambda: defaults.lambda,
     omega_D_ref: defaults.omega_D_ref,
     E_F: defaults.E_F,
-    M: defaults.M,
     T: defaults.T ?? 0.10112381297708082,
   };
 }

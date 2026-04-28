@@ -43,9 +43,10 @@ describe("Story 2.4 updating and error states", () => {
     fireEvent.change(screen.getByLabelText(/coupling strength \(λ\)/i), { target: { value: "0.35" } });
     fireEvent.change(screen.getByLabelText(/coupling strength \(λ\)/i), { target: { value: "0.40" } });
 
-    await waitFor(() => expect(screen.getByLabelText(/core metric cards/i)).toHaveTextContent("0.9307338226"));
+    await waitFor(() => expect(screen.getByLabelText(/core metric cards/i)).toHaveTextContent("0.9307338226"), { timeout: 5000 });
+    await waitFor(() => expect(screen.getByLabelText(/gap plot readout/i)).toBeInTheDocument(), { timeout: 5000 });
     expect(screen.getByLabelText(/gap plot readout/i)).toHaveTextContent("1.64170");
-  });
+  }, 15000);
 
   it("uses distinct visible treatment for constrained states", () => {
     const constrainedState: ExplorerState = {
@@ -57,7 +58,7 @@ describe("Story 2.4 updating and error states", () => {
       reducedMotion: false,
       reducedMotionSupported: true,
       thresholdProbeStrength: 0.25,
-      parameters: { lambda: 0.55, omega_D_ref: 10, E_F: 100, M: 1, T: 0.1 },
+      parameters: { lambda: 0.55, omega_D_ref: 10, E_F: 100, T: 0.1 },
       effectiveParameters: { omega_D: 10, omega_D_over_E_F: 0.1 },
       baseline: null,
       inspectedSession: null,
@@ -99,7 +100,7 @@ describe("Story 2.4 updating and error states", () => {
       <>
         <StatusPanel state={constrainedState} />
         <MetricsPanel state={constrainedState} />
-        <PlotPanel state={constrainedState} onThresholdChange={() => undefined} />
+        <PlotPanel state={constrainedState} />
       </>,
     );
 

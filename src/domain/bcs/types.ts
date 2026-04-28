@@ -9,7 +9,6 @@ export type ParameterVector = {
   lambda: number;
   omega_D_ref: number;
   E_F: number;
-  M: number;
   T: number;
 };
 

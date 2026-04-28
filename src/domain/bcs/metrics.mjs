@@ -8,28 +8,28 @@ export const ANALYTIC_CONSTANTS = Object.freeze({
 });
 
 export const BENCHMARK_CASES = Object.freeze([
-  benchmarkCase("Default", { lambda: 0.3, omega_D_ref: 10, E_F: 100, M: 1 }, {
+  benchmarkCase("Default", { lambda: 0.3, omega_D_ref: 10, E_F: 100 }, {
     omega_D: 10,
     T_c: 0.4044952519083233,
     Delta_0: 0.713479866945048,
     BCS_ratio: ANALYTIC_CONSTANTS.BCSRatio,
   }),
-  benchmarkCase("Weak edge", { lambda: 0.15, omega_D_ref: 10, E_F: 100, M: 1 }, {
+  benchmarkCase("Weak edge", { lambda: 0.15, omega_D_ref: 10, E_F: 100 }, {
     omega_D: 10,
     T_c: 0.014429960925572704,
     Delta_0: 0.025452676026796156,
     BCS_ratio: ANALYTIC_CONSTANTS.BCSRatio,
   }),
-  benchmarkCase("Strong valid edge", { lambda: 0.4, omega_D_ref: 10, E_F: 100, M: 1 }, {
+  benchmarkCase("Strong valid edge", { lambda: 0.4, omega_D_ref: 10, E_F: 100 }, {
     omega_D: 10,
     T_c: 0.9307338226216719,
     Delta_0: 1.641699972477976,
     BCS_ratio: ANALYTIC_CONSTANTS.BCSRatio,
   }),
-  benchmarkCase("Heavier isotope", { lambda: 0.3, omega_D_ref: 10, E_F: 100, M: 2 }, {
-    omega_D: 7.071067811865475,
-    T_c: 0.28602133558213616,
-    Delta_0: 0.504506452156919,
+  benchmarkCase("Reference repeat", { lambda: 0.3, omega_D_ref: 10, E_F: 100 }, {
+    omega_D: 10,
+    T_c: 0.4044952519083233,
+    Delta_0: 0.713479866945048,
     BCS_ratio: ANALYTIC_CONSTANTS.BCSRatio,
   }),
 ]);
@@ -188,7 +188,6 @@ function normalizeSourceParameters(parameters) {
     lambda: Number(parameters.lambda),
     omega_D_ref: Number(parameters.omega_D_ref),
     E_F: Number(parameters.E_F),
-    M: Number(parameters.M),
     ...(parameters.T === undefined ? {} : { T: Number(parameters.T) }),
   };
 }

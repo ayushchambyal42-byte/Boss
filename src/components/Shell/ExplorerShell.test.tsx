@@ -265,7 +265,7 @@ describe("Story 2.1 explorer state reducer", () => {
     state = explorerReducer(state, { type: "view/selected", view: "explorer" });
     state = explorerReducer(state, { type: "parameters/changed", parameters: { lambda: 0.35 } });
     const versionAfterChange = state.stateVersion;
-    state = explorerReducer(state, { type: "parameters/changed", parameters: { M: 1.5 } });
+    state = explorerReducer(state, { type: "parameters/changed", parameters: { T: 0.2 } });
     const currentVersion = state.stateVersion;
 
     const stale = explorerReducer(state, {

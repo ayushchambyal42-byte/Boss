@@ -1,4 +1,5 @@
 import { buildMetricCardModel, computeCoreMetrics } from "./metrics.mjs";
+import { formatKelvin, formatMeV } from "./displayUnits.ts";
 import { computeEffectiveParameters } from "./parameters.mjs";
 import { ANALYTIC_CONSTANTS } from "./metrics.mjs";
 import type { MetricView, ParameterVector } from "./types.ts";
@@ -31,11 +32,11 @@ export function buildMetricCardViews(parameters: ParameterVector): MetricView {
       .filter((card: { key: string }) =>
         ["T_c", "Delta_0", "Delta_0_over_kBTc", "BCS_ratio"].includes(card.key),
       )
-      .map((card: { key: string; rounded: string; status: string }) => ({
+      .map((card: { key: string; value: number; rounded: string; status: string }) => ({
         key: card.key,
         label: METRIC_LABELS[card.key] ?? card.key,
         unit: METRIC_UNITS[card.key] ?? "dimensionless",
-        roundedValue: card.rounded,
+        roundedValue: formatMetricValue(card.key, card.value, card.rounded),
         stateLabel: card.status,
       })),
   };
@@ -63,11 +64,21 @@ const METRIC_LABELS: Record<string, string> = {
 };
 
 const METRIC_UNITS: Record<string, string> = {
-  T_c: "energy",
-  Delta_0: "energy",
+  T_c: "K",
+  Delta_0: "meV",
   Delta_0_over_kBTc: "dimensionless",
   BCS_ratio: "dimensionless",
 };
+
+function formatMetricValue(key: string, value: number, fallback: string): string {
+  if (key === "T_c") {
+    return formatKelvin(value);
+  }
+  if (key === "Delta_0") {
+    return formatMeV(value);
+  }
+  return fallback;
+}
 
 function buildMetricMessage(status: string, issues: Array<{ status: string; message: string }>): string | null {
   if (status === "invalid") {

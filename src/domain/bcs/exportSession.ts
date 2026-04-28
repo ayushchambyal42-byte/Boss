@@ -139,13 +139,12 @@ function toImportedParameters(entries: ExportedParameterEntry[]): ParameterVecto
     lambda: read("lambda"),
     omega_D_ref: read("omega_D_ref"),
     E_F: read("E_F"),
-    M: read("M"),
     T: read("T"),
   };
 }
 
 function validateImportedParameters(entries: ExportedParameterEntry[]): void {
-  const requiredKeys: Array<ExportedParameterEntry["key"]> = ["lambda", "omega_D_ref", "E_F", "M", "T"];
+  const requiredKeys: Array<ExportedParameterEntry["key"]> = ["lambda", "omega_D_ref", "E_F", "T"];
 
   for (const key of requiredKeys) {
     const entry = entries.find((candidate) => candidate.key === key);

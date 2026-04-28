@@ -1,9 +1,11 @@
 import { useRef } from "react";
+import { formatKelvin, formatMeV } from "../../domain/bcs/displayUnits.ts";
 import { getParameterControlDefinitions } from "../../domain/bcs/parameters.ts";
 import type { BaselineSnapshot, ParameterKey, ParameterVector, SessionInspection } from "../../domain/bcs/types.ts";
 
 type ControlsPanelProps = {
   parameters: ParameterVector;
+  playing: boolean;
   baseline: BaselineSnapshot | null;
   inspectedSession: SessionInspection | null;
   importedSessionError: string | null;
@@ -11,6 +13,7 @@ type ControlsPanelProps = {
   exportVersion: string;
   exportTrustStatus: string;
   onParameterChange: (parameters: Partial<ParameterVector>) => void;
+  onTogglePlaying: () => void;
   onCaptureBaseline: () => void;
   onImportSession: (file: File) => void;
   onRestoreImportedSession: () => void;
@@ -22,14 +25,14 @@ type ControlsPanelProps = {
 
 const VALUE_FORMATTERS: Record<ParameterKey, (value: number) => string> = {
   lambda: (value) => value.toFixed(2),
-  omega_D_ref: (value) => value.toFixed(1),
-  E_F: (value) => value.toFixed(0),
-  M: (value) => value.toFixed(2),
-  T: (value) => value.toFixed(3),
+  omega_D_ref: (value) => formatMeV(value, 3),
+  E_F: (value) => formatMeV(value, 3),
+  T: (value) => formatKelvin(value, 3),
 };
 
 export function ControlsPanel({
   parameters,
+  playing,
   baseline,
   inspectedSession,
   importedSessionError,
@@ -37,6 +40,7 @@ export function ControlsPanel({
   exportVersion,
   exportTrustStatus,
   onParameterChange,
+  onTogglePlaying,
   onCaptureBaseline,
   onImportSession,
   onRestoreImportedSession,
@@ -53,6 +57,9 @@ export function ControlsPanel({
       <header className="panel-header">
         <h2>Controls</h2>
         <div className="header-actions">
+          <button type="button" className="secondary" onClick={onTogglePlaying}>
+            {playing ? "Pause" : "Play"}
+          </button>
           <button type="button" className="secondary" onClick={onCaptureBaseline} disabled={!canCaptureBaseline}>
             {baseline ? "Update baseline" : "Set baseline"}
           </button>
@@ -96,7 +103,7 @@ export function ControlsPanel({
             <div className="control-reading">
               <output htmlFor={`parameter-${control.key}`}>{VALUE_FORMATTERS[control.key](parameters[control.key])}</output>
               <span>
-                {control.min} to {control.max}
+                {VALUE_FORMATTERS[control.key](control.min)} to {VALUE_FORMATTERS[control.key](control.max)}
               </span>
             </div>
           </div>

@@ -1,4 +1,5 @@
 import { APP_VERSION } from "../../appMetadata.ts";
+import { formatMeV } from "../../domain/bcs/displayUnits.ts";
 import { buildTrustStatusSummary } from "../../domain/bcs/trustStatus.ts";
 import { buildValidityGuidance, guidanceToneClass } from "../../domain/bcs/validityGuidance.ts";
 import type { ExplorerState } from "../../domain/bcs/types.ts";
@@ -43,8 +44,8 @@ export function StatusPanel({ state }: { state: ExplorerState }) {
       </div>
       <dl className="data-grid">
         <div>
-          <dt>ω_D</dt>
-          <dd>{state.effectiveParameters.omega_D.toFixed(4)}</dd>
+          <dt>Debye energy ħω_D (meV)</dt>
+          <dd>{formatMeV(state.effectiveParameters.omega_D, 3)}</dd>
         </div>
         <div>
           <dt>ω_D / E_F</dt>

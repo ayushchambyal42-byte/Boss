@@ -9,9 +9,10 @@ import type { AppView, ExplorerState, ParameterVector } from "../../domain/bcs/t
 
 type ExplorerShellProps = {
   state: ExplorerState;
+  playing: boolean;
   onNavigate: (view: AppView) => void;
   onParameterChange: (parameters: Partial<ParameterVector>) => void;
-  onThresholdChange: (probeStrength: number) => void;
+  onTogglePlaying: () => void;
   onCaptureBaseline: () => void;
   onImportSession: (file: File) => void;
   onRestoreImportedSession: () => void;
@@ -23,9 +24,10 @@ type ExplorerShellProps = {
 
 export function ExplorerShell({
   state,
+  playing,
   onNavigate,
   onParameterChange,
-  onThresholdChange,
+  onTogglePlaying,
   onCaptureBaseline,
   onImportSession,
   onRestoreImportedSession,
@@ -99,6 +101,7 @@ export function ExplorerShell({
         <div className="left-rail">
           <ControlsPanel
             parameters={state.parameters}
+            playing={playing}
             baseline={state.baseline}
             inspectedSession={state.inspectedSession}
             importedSessionError={state.importedSessionError}
@@ -106,6 +109,7 @@ export function ExplorerShell({
             exportVersion={APP_VERSION}
             exportTrustStatus={exportSessionPackage.sessionTrustStatus}
             onParameterChange={onParameterChange}
+            onTogglePlaying={onTogglePlaying}
             onCaptureBaseline={onCaptureBaseline}
             onImportSession={onImportSession}
             onRestoreImportedSession={onRestoreImportedSession}
@@ -114,13 +118,13 @@ export function ExplorerShell({
             onExportSession={onExportSession}
             onReset={onReset}
           />
-          <StatusPanel state={state} />
         </div>
         <div className="center-rail">
-          <PlotPanel state={state} onThresholdChange={onThresholdChange} />
+          <PlotPanel state={state} playing={playing} />
         </div>
         <div className="right-rail">
           <MetricsPanel state={state} />
+          <StatusPanel state={state} />
         </div>
       </div>
     </section>

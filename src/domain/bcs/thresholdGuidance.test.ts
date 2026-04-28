@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildThresholdGuidance } from "./thresholdGuidance.ts";
 
-const baseParameters = { lambda: 0.3, omega_D_ref: 10, E_F: 100, M: 1, T: 0.10112381297708083 };
+const baseParameters = { lambda: 0.3, omega_D_ref: 10, E_F: 100, T: 0.10112381297708083 };
 const baseEffectiveParameters = { omega_D: 10, omega_D_over_E_F: 0.1 };
 
 describe("Story 3.3 threshold guidance", () => {

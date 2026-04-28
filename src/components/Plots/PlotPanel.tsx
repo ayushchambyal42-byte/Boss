@@ -1,13 +1,61 @@
+import { useEffect, useState } from "react";
+import { KB_EV_PER_K, REFERENCE_TC_K, formatKelvin, formatMeV } from "../../domain/bcs/displayUnits.ts";
 import { deriveCriticalTemperature } from "../../domain/bcs/metrics.ts";
-import { assessThresholdProbe, THRESHOLD_INTERACTION_CONTRACT } from "../../domain/bcs/thresholdContract.ts";
-import { buildThresholdGuidance } from "../../domain/bcs/thresholdGuidance.ts";
 import { buildValidityGuidance, guidanceToneClass } from "../../domain/bcs/validityGuidance.ts";
 import type { ExplorerState } from "../../domain/bcs/types.ts";
-import { TruthLayerStrip } from "../Truth/TruthLayerStrip.tsx";
+import { DOSPanel } from "../DOSPanel.tsx";
 
-export function PlotPanel({ state, onThresholdChange }: { state: ExplorerState; onThresholdChange: (probeStrength: number) => void }) {
+export function PlotPanel({ state, playing }: { state: ExplorerState; playing?: boolean }) {
   const plotView = state.computed.plotView;
   const validityGuidance = buildValidityGuidance(state);
+  const currentDelta = plotView?.plot?.selectedPoint.Delta ?? Number.NaN;
+  const currentDelta0 = plotView?.metricSnapshot?.Delta_0 ?? Number.NaN;
+  const currentTemperature = plotView?.plot?.selectedPoint.T ?? state.parameters.T;
+  const currentTc = deriveCriticalTemperature(state.parameters);
+  const reducedTemperature = currentTc > 0 ? state.parameters.T / currentTc : Number.NaN;
+  const transitionNarrative = buildTransitionNarrative(reducedTemperature);
+  const nearTransition = Number.isFinite(reducedTemperature) && reducedTemperature > 0.95;
+  const dosUnavailable = state.validity.status === "invalid" || state.updateStatus === "invalid" || plotView?.viewState === "invalid";
+  const [dosTraceDeltas, setDosTraceDeltas] = useState<number[]>([]);
+  const [displayTemperature, setDisplayTemperature] = useState(currentTemperature);
+
+  useEffect(() => {
+    if (!Number.isFinite(currentTemperature)) {
+      setDisplayTemperature(currentTemperature);
+      return;
+    }
+
+    if (!playing) {
+      setDisplayTemperature(currentTemperature);
+      return;
+    }
+
+    setDisplayTemperature((previous) => {
+      if (!Number.isFinite(previous)) {
+        return currentTemperature;
+      }
+      const alpha = 0.9;
+      return alpha * previous + (1 - alpha) * currentTemperature;
+    });
+  }, [currentTemperature, playing]);
+
+  useEffect(() => {
+    if (!playing || !Number.isFinite(currentDelta) || currentDelta < 0) {
+      if (!playing) {
+        setDosTraceDeltas([]);
+      }
+      return;
+    }
+
+    setDosTraceDeltas((previous) => {
+      if (previous.length > 0 && Math.abs(previous[previous.length - 1] - currentDelta) < 1e-6) {
+        return previous;
+      }
+      const next = [...previous, currentDelta];
+      return next.slice(-6, -1).concat(next.slice(-1));
+    });
+  }, [currentDelta, playing]);
+
   if (!plotView) {
     return (
       <section className="panel plot-panel">
@@ -22,7 +70,7 @@ export function PlotPanel({ state, onThresholdChange }: { state: ExplorerState; 
             <p className="validity-guidance-copy">{validityGuidance.summary}</p>
             <p className="validity-guidance-action">{validityGuidance.recommendation}</p>
           </div>
-          <ThresholdResponsePanel state={state} onThresholdChange={onThresholdChange} />
+          <DOSPanel delta={currentDelta} delta0={currentDelta0} traceDeltas={dosTraceDeltas.slice(0, -1)} unavailable={dosUnavailable} />
         </div>
       </section>
     );
@@ -30,16 +78,29 @@ export function PlotPanel({ state, onThresholdChange }: { state: ExplorerState; 
   const samples = plotView.plot?.samples ?? [];
   const width = 640;
   const height = 320;
-  const padding = 28;
-  const maxT = plotView.plot?.domain.maxT ?? 1;
-  const maxDelta = Math.max(plotView.metricSnapshot?.Delta_0 ?? 1, 1e-9);
+  const paddingLeft = 56;
+  const paddingRight = 28;
+  const paddingTop = 28;
+  const paddingBottom = 52;
+  const tickMargin = 8;
+  const maxT = plotView.plot?.domain.maxT ?? (currentTc > 0 ? 1.2 * currentTc : 1);
+  const maxDelta = Math.max(currentDelta0 || 1, 1e-9);
+  const plotWidth = width - paddingLeft - paddingRight;
+  const plotHeight = height - paddingTop - paddingBottom;
+  const xTicks = buildAxisTicksWithTc(0, maxT, currentTc, 5);
+  const yTicks = buildLinearTicks(0, maxDelta, 5);
   const path = samples
     .map((point: { T: number; Delta: number }, index: number) => {
-      const x = padding + (point.T / maxT) * (width - padding * 2);
-      const y = height - padding - (point.Delta / maxDelta) * (height - padding * 2);
+      const x = paddingLeft + (point.T / maxT) * plotWidth;
+      const y = height - paddingBottom - (point.Delta / maxDelta) * plotHeight;
       return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
     })
     .join(" ");
+  const fallbackPointerPoint = plotView.plot?.selectedPoint ?? { T: currentTemperature, Delta: currentDelta };
+  const pointerPoint = findNearestCurvePoint(samples, displayTemperature) ?? fallbackPointerPoint;
+  const pointerX = paddingLeft + (pointerPoint.T / maxT) * plotWidth;
+  const pointerY = height - paddingBottom - (Math.max(pointerPoint.Delta, 0) / maxDelta) * plotHeight;
+  const tcX = currentTc > 0 ? paddingLeft + (currentTc / maxT) * plotWidth : null;
 
   return (
     <section className="panel plot-panel">
@@ -53,9 +114,10 @@ export function PlotPanel({ state, onThresholdChange }: { state: ExplorerState; 
             <strong>State:</strong> {plotView.viewState}
           </p>
           <p>
-            <strong>Units:</strong> temperature and gap in energy
+            <strong>Units:</strong> Temperature (K), Gap Δ(T) (meV), Energy (meV)
           </p>
         </div>
+        <p className="physics-note">Display conversion uses k_B = {KB_EV_PER_K.toExponential(3)} eV/K, T_c = {REFERENCE_TC_K} K, and ħ = 1.</p>
         {state.validity.status !== "valid" || state.updateStatus === "failed" ? (
           <div className={`validity-guidance validity-guidance-${guidanceToneClass(validityGuidance.tone)}`} aria-label="Plot validity guidance">
             <p className="validity-guidance-label">{validityGuidance.label}</p>
@@ -69,30 +131,79 @@ export function PlotPanel({ state, onThresholdChange }: { state: ExplorerState; 
         {plotView.plot ? (
           <>
             <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Main superconducting gap plot" className="gap-plot">
-              <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} className="plot-axis" />
-              <line x1={padding} y1={padding} x2={padding} y2={height - padding} className="plot-axis" />
+              {xTicks.map((tick) => {
+                const x = paddingLeft + (tick / maxT) * plotWidth;
+                return (
+                  <g key={`gap-x-${tick}`}>
+                    <line x1={x} y1={height - paddingBottom} x2={x} y2={height - paddingBottom + 6} className="plot-tick" />
+                    <text x={x} y={height - paddingBottom + 6 + tickMargin + 10} textAnchor="middle" className="plot-tick-label">
+                      {formatTemperatureTick(tick, currentTc)}
+                    </text>
+                  </g>
+                );
+              })}
+              {yTicks.map((tick) => {
+                const y = height - paddingBottom - (tick / maxDelta) * plotHeight;
+                return (
+                  <g key={`gap-y-${tick}`}>
+                    <line x1={paddingLeft - 6} y1={y} x2={paddingLeft} y2={y} className="plot-tick" />
+                    <text x={paddingLeft - 6 - tickMargin} y={y + 4} textAnchor="end" className="plot-tick-label">
+                      {formatMeV(tick)}
+                    </text>
+                  </g>
+                );
+              })}
+              <line x1={paddingLeft} y1={height - paddingBottom} x2={width - paddingRight} y2={height - paddingBottom} className="plot-axis" />
+              <line x1={paddingLeft} y1={paddingTop} x2={paddingLeft} y2={height - paddingBottom} className="plot-axis" />
+              {tcX !== null ? <line x1={tcX} y1={paddingTop} x2={tcX} y2={height - paddingBottom} className="plot-tc-line" /> : null}
+              {tcX !== null ? (
+                <text x={tcX} y={paddingTop + 12} textAnchor="middle" className="plot-tc-label">
+                  Tc
+                </text>
+              ) : null}
               <path d={path} className="plot-line" />
               <circle
-                cx={padding + (plotView.plot.selectedPoint.T / maxT) * (width - padding * 2)}
-                cy={height - padding - (plotView.plot.selectedPoint.Delta / maxDelta) * (height - padding * 2)}
-                r="4"
-                className="plot-point"
+                cx={pointerX}
+                cy={pointerY}
+                r={nearTransition ? "6" : "4"}
+                className={`plot-point${nearTransition ? " plot-point-critical" : ""}`}
               />
-              <text x={width / 2} y={height - 6} textAnchor="middle" className="plot-label">
-                Temperature T (energy)
+              {nearTransition ? (
+                <circle
+                  cx={pointerX}
+                  cy={pointerY}
+                  r="10"
+                  className="plot-point-halo"
+                />
+              ) : null}
+              <text
+                x={pointerX + 10}
+                y={pointerY - 8}
+                textAnchor="start"
+                className="plot-label"
+              >
+                Current state
+              </text>
+              <text x={width / 2} y={height - 10} textAnchor="middle" className="plot-label">
+                Temperature (K)
               </text>
               <text x={18} y={height / 2} textAnchor="middle" transform={`rotate(-90 18 ${height / 2})`} className="plot-label">
-                Gap Δ(T) (energy)
+                Gap Δ(T) (meV)
               </text>
             </svg>
+            <div className={`transition-story${nearTransition ? " transition-story-critical" : ""}`} aria-label="Transition narrative">
+              <p className="comparison-title">{transitionNarrative}</p>
+              {nearTransition ? <p className="comparison-copy">Gap collapses → no energy barrier → normal metal</p> : null}
+              {nearTransition ? <p className="comparison-copy transition-story-strong">At Tc: Δ → 0 → superconductivity destroyed</p> : null}
+            </div>
             <dl className="plot-readout" aria-label="Gap plot readout">
               <div>
-                <dt>Selected T</dt>
-                <dd>{plotView.plot.selectedPoint.T.toPrecision(6)}</dd>
+                <dt>Selected T (K)</dt>
+                <dd>{formatKelvin(plotView.plot.selectedPoint.T)}</dd>
               </div>
               <div>
-                <dt>Selected Δ(T)</dt>
-                <dd>{plotView.plot.selectedPoint.Delta.toPrecision(6)}</dd>
+                <dt>Selected Δ(T) (meV)</dt>
+                <dd>{formatMeV(plotView.plot.selectedPoint.Delta)}</dd>
               </div>
               <div>
                 <dt>Rendered state version</dt>
@@ -108,103 +219,7 @@ export function PlotPanel({ state, onThresholdChange }: { state: ExplorerState; 
         ) : (
           <p>{plotView.message ?? "Plot unavailable for the current validated state."}</p>
         )}
-        <ThresholdResponsePanel state={state} onThresholdChange={onThresholdChange} />
-      </div>
-    </section>
-  );
-}
-
-function ThresholdResponsePanel({ state, onThresholdChange }: { state: ExplorerState; onThresholdChange: (probeStrength: number) => void }) {
-  const rawSelectedGap = state.computed.plotView?.plot?.selectedPoint.Delta ?? null;
-  const assessment = assessThresholdProbe({
-    probeStrength: state.thresholdProbeStrength,
-    selectedGap: rawSelectedGap,
-    updateStatus: state.updateStatus,
-    validityStatus: state.validity.status,
-  });
-  const canShowCurrentGapContext = assessment.state !== "updating" && assessment.state !== "unavailable";
-  const selectedGap =
-    canShowCurrentGapContext && Number.isFinite(rawSelectedGap) && rawSelectedGap !== null ? rawSelectedGap : null;
-  const probeEnergy = selectedGap !== null ? state.thresholdProbeStrength * selectedGap : null;
-  const gapLabel = assessment.state === "updating" ? "Selected Δ(T) context" : "Current selected Δ(T)";
-  const gapScaleLabel = assessment.state === "updating" ? "stale values hidden during recomputation" : "computed energy scale";
-  const guidance = buildThresholdGuidance({
-    assessment,
-    parameters: state.parameters,
-    effectiveParameters: state.effectiveParameters,
-    validity: state.validity,
-    baseline: state.baseline,
-  });
-
-  return (
-    <section className="threshold-panel" aria-label="Threshold response view">
-      <TruthLayerStrip
-        ariaLabel="Threshold truth layers"
-        kicker="Threshold interaction"
-        items={[
-          { label: "computed context", tone: "computed" },
-          { label: "phenomenological response", tone: "phenomenological" },
-          { label: "interpretive guidance", tone: "interpretive" },
-        ]}
-      />
-      <div className="comparison-header">
-        <p className="comparison-title">{THRESHOLD_INTERACTION_CONTRACT.title}</p>
-        <span className="truth-label truth-label-subordinate">{assessment.truthLayer}</span>
-      </div>
-      <p className="comparison-copy">
-        Probe strength is interpreted relative to the current selected gap. This is a phenomenological teaching view, not a non-equilibrium simulation.
-      </p>
-      <div className="control-card threshold-control-card">
-        <div className="control-heading">
-          <label htmlFor="threshold-probe-strength" className="control-label">
-            {THRESHOLD_INTERACTION_CONTRACT.control.label}
-          </label>
-          <span className="control-unit">{THRESHOLD_INTERACTION_CONTRACT.control.unit}</span>
-        </div>
-        <input
-          id="threshold-probe-strength"
-          name="thresholdProbeStrength"
-          type="range"
-          min={THRESHOLD_INTERACTION_CONTRACT.control.min}
-          max={THRESHOLD_INTERACTION_CONTRACT.control.max}
-          step={THRESHOLD_INTERACTION_CONTRACT.control.step}
-          value={state.thresholdProbeStrength}
-          onChange={(event) => onThresholdChange(Number(event.currentTarget.value))}
-        />
-        <div className="control-reading">
-          <output htmlFor="threshold-probe-strength">{state.thresholdProbeStrength.toFixed(2)}x gap</output>
-          <span>
-            {THRESHOLD_INTERACTION_CONTRACT.control.min} to {THRESHOLD_INTERACTION_CONTRACT.control.max}
-          </span>
-        </div>
-      </div>
-      <dl className="comparison-grid threshold-grid">
-        <div>
-          <dt>{gapLabel}</dt>
-          <dd>{selectedGap !== null ? selectedGap.toPrecision(6) : "unavailable"}</dd>
-          <dd className="comparison-delta comparison-flat">{gapScaleLabel}</dd>
-        </div>
-        <div>
-          <dt>Probe energy equivalent</dt>
-          <dd>{probeEnergy !== null ? probeEnergy.toPrecision(6) : "unavailable"}</dd>
-          <dd className={`comparison-delta comparison-${assessment.state === "disruptive" ? "up" : assessment.state === "sub-threshold" ? "down" : "flat"}`}>
-            {assessment.label}
-          </dd>
-        </div>
-      </dl>
-      <p className={`state-banner ${thresholdBannerClassName(assessment.state)}`}>{assessment.meaning}</p>
-      <div className="threshold-guidance" aria-label="Threshold guidance">
-        <div className="comparison-header">
-          <p className="comparison-title">{guidance.title}</p>
-          <span className="truth-label truth-label-subordinate">{guidance.truthLayer}</span>
-        </div>
-        <p className="comparison-copy">{guidance.summary}</p>
-        <ul className="issue-list threshold-guidance-list">
-          {guidance.details.map((detail) => (
-            <li key={detail}>{detail}</li>
-          ))}
-        </ul>
-        <p className="threshold-stage-cue">{guidance.stageCue}</p>
+        <DOSPanel delta={currentDelta} delta0={currentDelta0} traceDeltas={dosTraceDeltas.slice(0, -1)} unavailable={dosUnavailable} />
       </div>
     </section>
   );
@@ -318,15 +333,56 @@ function directionLabel(current: number, baseline: number): string {
   return "unchanged";
 }
 
-function thresholdBannerClassName(state: ReturnType<typeof assessThresholdProbe>["state"]): string {
-  if (state === "disruptive") {
-    return "state-banner-constrained";
+function buildTransitionNarrative(reducedTemperature: number): string {
+  if (!Number.isFinite(reducedTemperature)) {
+    return "Strong pairing regime (few excitations)";
   }
-  if (state === "updating" || state === "sub-threshold") {
-    return "state-banner-pending";
+  if (reducedTemperature >= 1) {
+    return "Normal metal (no gap)";
   }
-  if (state === "constrained") {
-    return "state-banner-constrained";
+  if (reducedTemperature > 0.8) {
+    return "Gap collapse imminent";
   }
-  return "state-banner-invalid";
+  if (reducedTemperature > 0.3) {
+    return "Pair breaking begins";
+  }
+  return "Strong pairing regime (few excitations)";
+}
+
+function buildLinearTicks(min: number, max: number, count: number): number[] {
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min || count < 2) {
+    return [min, max].filter(Number.isFinite);
+  }
+
+  return Array.from({ length: count }, (_, index) => min + ((max - min) * index) / (count - 1));
+}
+
+function buildAxisTicksWithTc(min: number, max: number, tc: number, count: number): number[] {
+  const ticks = buildLinearTicks(min, max, count);
+  if (!Number.isFinite(tc) || tc < min || tc > max) {
+    return ticks;
+  }
+
+  const mergedTicks = [...ticks, tc].sort((left, right) => left - right);
+  return mergedTicks.filter((tick, index) => index === 0 || Math.abs(tick - mergedTicks[index - 1]) > 1e-9);
+}
+
+function formatTemperatureTick(value: number, tc: number): string {
+  if (Number.isFinite(tc) && Math.abs(value - tc) <= Math.max(Math.abs(tc), 1) * 1e-9) {
+    return "Tc";
+  }
+  return formatKelvin(value);
+}
+
+function findNearestCurvePoint(samples: Array<{ T: number; Delta: number }>, temperature: number) {
+  if (samples.length === 0 || !Number.isFinite(temperature)) {
+    return null;
+  }
+
+  return samples.reduce((nearest, sample) => {
+    if (!nearest) {
+      return sample;
+    }
+    return Math.abs(sample.T - temperature) < Math.abs(nearest.T - temperature) ? sample : nearest;
+  }, null as { T: number; Delta: number } | null);
 }

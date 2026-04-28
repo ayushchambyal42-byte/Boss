@@ -28,7 +28,6 @@ export function normalizeParameterVector(parameters: Partial<ParameterVector>): 
     lambda: clamped.lambda,
     omega_D_ref: clamped.omega_D_ref,
     E_F: clamped.E_F,
-    M: clamped.M,
     T: clamped.T ?? defaults.T,
   };
 }
@@ -45,9 +44,8 @@ export function getParameterControlDefinitions(
 
   return [
     buildControl("lambda", "λ", PARAMETER_CONTRACT.lambda),
-    buildControl("omega_D_ref", "ω_D,ref", PARAMETER_CONTRACT.omega_D_ref),
+    buildControl("omega_D_ref", "ħω_D", PARAMETER_CONTRACT.omega_D_ref),
     buildControl("E_F", "E_F", PARAMETER_CONTRACT.E_F),
-    buildControl("M", "M", PARAMETER_CONTRACT.M),
     buildControl("T", "T", {
       ...PARAMETER_CONTRACT.T,
       uiRange: temperatureControl.uiRange,

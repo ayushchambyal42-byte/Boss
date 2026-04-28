@@ -10,7 +10,6 @@ export const DEFAULT_PARAMETERS = Object.freeze({
   lambda: 0.3,
   omega_D_ref: 10,
   E_F: 100,
-  M: 1,
 });
 
 export const PARAMETER_CONTRACT = Object.freeze({
@@ -27,9 +26,9 @@ export const PARAMETER_CONTRACT = Object.freeze({
     invalid: "lambda <= 0 or lambda > 0.60",
   }),
   omega_D_ref: Object.freeze({
-    label: "Reference Debye cutoff",
+    label: "Debye energy",
     exportKey: "omega_D_ref",
-    unit: "energy",
+    unit: "meV",
     default: 10,
     uiRange: Object.freeze({ min: 1, max: 50 }),
     step: 0.5,
@@ -41,7 +40,7 @@ export const PARAMETER_CONTRACT = Object.freeze({
   E_F: Object.freeze({
     label: "Fermi energy",
     exportKey: "E_F",
-    unit: "energy",
+    unit: "meV",
     default: 100,
     uiRange: Object.freeze({ min: 20, max: 1000 }),
     step: 10,
@@ -50,22 +49,10 @@ export const PARAMETER_CONTRACT = Object.freeze({
     constrained: "0.15 < omega_D / E_F <= 0.20",
     invalid: "E_F <= 0 or effective omega_D / E_F > 0.20",
   }),
-  M: Object.freeze({
-    label: "Isotope mass",
-    exportKey: "M",
-    unit: "relative mass",
-    default: 1,
-    uiRange: Object.freeze({ min: 0.5, max: 4 }),
-    step: 0.05,
-    valid: "0.50 <= M <= 4.00",
-    nearEdge: "none",
-    constrained: "none",
-    invalid: "M <= 0",
-  }),
   T: Object.freeze({
     label: "Temperature",
     exportKey: "T",
-    unit: "energy",
+    unit: "K",
     default: "0.25 * T_c after T_c is computed",
     uiRange: Object.freeze({ min: 0, max: "1.25 * T_c" }),
     step: "max(0.001, 0.01 * T_c)",
@@ -79,8 +66,7 @@ export const PARAMETER_CONTRACT = Object.freeze({
 export function computeEffectiveParameters(parameters) {
   const omegaDRef = Number(parameters.omega_D_ref);
   const fermiEnergy = Number(parameters.E_F);
-  const isotopeMass = Number(parameters.M);
-  const omega_D = omegaDRef / Math.sqrt(isotopeMass);
+  const omega_D = omegaDRef;
 
   return {
     omega_D,
@@ -118,7 +104,6 @@ export function clampSliderParameters(parameters, options = {}) {
     lambda: clamp(Number(parameters.lambda), PARAMETER_CONTRACT.lambda.uiRange),
     omega_D_ref: clamp(Number(parameters.omega_D_ref), PARAMETER_CONTRACT.omega_D_ref.uiRange),
     E_F: clamp(Number(parameters.E_F), PARAMETER_CONTRACT.E_F.uiRange),
-    M: clamp(Number(parameters.M), PARAMETER_CONTRACT.M.uiRange),
   };
 
   if ("T" in parameters) {
@@ -133,7 +118,6 @@ export function classifyParameterState(parameters, options = {}) {
   const lambda = Number(parameters.lambda);
   const omegaDRef = Number(parameters.omega_D_ref);
   const fermiEnergy = Number(parameters.E_F);
-  const isotopeMass = Number(parameters.M);
 
   if (!Number.isFinite(lambda) || lambda <= 0 || lambda > 0.6) {
     issues.push(issue("invalid", "lambda outside hard-valid bounds"));
@@ -149,10 +133,6 @@ export function classifyParameterState(parameters, options = {}) {
 
   if (!Number.isFinite(fermiEnergy) || fermiEnergy <= 0) {
     issues.push(issue("invalid", "E_F must be positive"));
-  }
-
-  if (!Number.isFinite(isotopeMass) || isotopeMass <= 0) {
-    issues.push(issue("invalid", "M must be positive"));
   }
 
   if (!issues.some((entry) => entry.status === "invalid")) {

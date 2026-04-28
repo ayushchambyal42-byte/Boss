@@ -8,8 +8,8 @@ export const GAP_SOLVER_CONTRACT = Object.freeze({
   maxRootIterations: 96,
   gapToleranceScale: 1e-8,
   residualTolerance: 1e-7,
-  curveSampleCount: 64,
-  curveDomainMultiplier: 1.25,
+  curveSampleCount: 201,
+  curveDomainMultiplier: 1.2,
   monotonicToleranceScale: 1e-7,
 });
 
@@ -411,7 +411,6 @@ function normalizeStateVector(parameters) {
     lambda: Number(parameters.lambda),
     omega_D_ref: Number(parameters.omega_D_ref),
     E_F: Number(parameters.E_F),
-    M: Number(parameters.M),
     T: Number(parameters.T ?? 0),
   };
 }
